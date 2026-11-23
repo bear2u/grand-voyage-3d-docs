@@ -1,0 +1,71 @@
+---
+import ports from '../data/atlas-ports.json';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+const stages = ['첫 출항', '3부 완료', '7부 완료', '13부 완료'];
+const position = (p: typeof ports[number]) => `left:${(p.lon + 180) / 3.6}%;top:${(90 - p.lat) / 1.8}%`;
+---
+<section class="port-atlas" aria-label="마리나의 세계 해도">
+  <div class="controls">
+    <label>이야기 진행
+      <select data-stage>{stages.map((stage, i) => <option value={i} data-image={`${base}/maps/ocean-${i}.jpg`}>{stage}</option>)}</select>
+    </label>
+    <label>항구 찾기
+      <select data-port>{[...ports].sort((a,b) => a.name.localeCompare(b.name, 'ko')).map(p =>
+        <option value={p.name} selected={p.name === '라구사'} data-level={p.level}>{p.name}</option>)}</select>
+    </label>
+  </div>
+  <div class="chart">
+    <img src={`${base}/maps/ocean-0.jpg`} alt="청록색으로 열린 해역을 표시한 세계 해도" />
+    {ports.map(p => <span class:list={['pin', {town: p.town, picked: p.name === '라구사'}]} data-name={p.name} data-level={p.level} style={position(p)} hidden={p.level > 0} aria-hidden="true" title={p.name}></span>)}
+  </div>
+  <p class="readout" aria-live="polite"><strong data-selection>라구사 · 마을항</strong><span data-count>첫 출항 · 44곳</span></p>
+  <p class="legend">◆ 마을항　● 보급항　◎ 선택한 항구</p>
+</section>
+<script>
+  for (const atlas of document.querySelectorAll<HTMLElement>('.port-atlas')) {
+    const stage = atlas.querySelector<HTMLSelectElement>('[data-stage]')!;
+    const port = atlas.querySelector<HTMLSelectElement>('[data-port]')!;
+    const map = atlas.querySelector<HTMLImageElement>('img')!;
+    const pins = [...atlas.querySelectorAll<HTMLElement>('.pin')];
+    const update = () => {
+      const level = Number(stage.value);
+      const page = stage.selectedOptions[0];
+      if (map.getAttribute('src') !== page.dataset.image) map.src = page.dataset.image!;
+      let count = 0;
+      for (const pin of pins) {
+        pin.hidden = Number(pin.dataset.level) > level;
+        if (!pin.hidden) count++;
+        const picked = pin.dataset.name === port.value;
+        pin.classList.toggle('picked', picked);
+        if (picked) atlas.querySelector('[data-selection]')!.textContent =
+          port.value + ' · ' + (pin.classList.contains('town') ? '마을항' : '보급항');
+      }
+      atlas.querySelector('[data-count]')!.textContent = page.text + ' · ' + count + '곳';
+    };
+    stage.addEventListener('change', () => {
+      if (Number(port.selectedOptions[0].dataset.level) > Number(stage.value)) port.value = '라구사';
+      update();
+    });
+    port.addEventListener('change', () => {
+      stage.value = String(Math.max(Number(stage.value), Number(port.selectedOptions[0].dataset.level)));
+      update();
+    });
+    update();
+  }
+</script>
+<style>
+  .port-atlas {margin:1.25rem 0;}
+  .controls,.readout {display:flex;align-items:center;flex-wrap:wrap;gap:.6rem 1.25rem;}
+  .controls {margin-bottom:.6rem;}
+  label {display:flex;align-items:center;gap:.5rem;font-weight:600;}
+  select {padding:.25rem .55rem;border:1px solid currentColor;border-radius:.3rem;background:Canvas;color:CanvasText;font:inherit;}
+  .chart {position:relative;isolation:isolate;}
+  .chart img {width:100%;height:auto;display:block;margin:0;}
+  .pin {position:absolute;display:block;width:6px;height:6px;border:1px solid #fff8da;background:#164a56;border-radius:50%;transform:translate(-50%,-50%);}
+  .pin.town {border-radius:1px;background:#804214;transform:translate(-50%,-50%) rotate(45deg);}
+  .pin[hidden] {display:none;}
+  .pin.picked {z-index:1;}
+  .pin.picked::after {content:'';position:absolute;left:50%;top:50%;width:18px;height:18px;border:3px solid #fff;border-radius:100%;box-shadow:0 0 0 2px #173b47;transform:translate(-50%,-50%);}
+  .readout {justify-content:space-between;margin:.45rem 0;}
+  .legend {font-size:.85em;margin:.15rem 0;}
+</style>
